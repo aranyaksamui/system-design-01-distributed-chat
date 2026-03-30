@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Chat Server Client</title>
+</head>
+<body>
+    <h2>Local Chat Room</h2>
+    <h3 id="username"></h3>
+
+    <form action="/" method="POST" id="set-name-form">
+        <label for="">Name:</label>
+        <input type="text" id="name-input">
+        <button type="submit">SET</button>
+    </form>
+    
+    <form id="chat-form" method="GET">
+        <label for="">Message:</label>
+        <input type="text" id="message-input">
+        <button type="submit">SEND</button>
+    </form>
+    <br>
+
+    <div id="message"></div>
+    
+    <script>
+        const ws = new WebSocket("ws://localhost:8000");
+        const messageDiv = document.getElementById("message");
+        let username;
+        let message;
+
+        ws.onmessage = (event) => {
+            const newMessage = document.createElement("div");
+            newMessage.textContent = event.data;
+            messageDiv.appendChild(newMessage);
+            messageDiv.scrollTop = messageDiv.scrollHeight;
+        }
+
+        document.getElementById("chat-form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            const input = document.getElementById("message-input");
+            message = `${username}: ${input.value}`;
+            ws.send(message);
+            input.value = "";
+        });
+
+        document.getElementById("set-name-form").addEventListener("submit", (e) => {
+            e.preventDefault();
+            usernameInput = document.getElementById("name-input");
+            username = usernameInput.value;
+            document.getElementById("username").textContent = username;
+            document.getElementById("set-name-form").style.display = "none";  
+        })
+    </script>
+</body>
+</html>

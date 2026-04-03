@@ -4,13 +4,36 @@ import fs from "fs";
 import path from "path";
 import Redis from "ioredis";
 
-const SERVER_PORT = 8000;
+
+const DEFAULT_SERVER_PORT = 8000;
 const REDIS_HOST_PORT = 6262;
 
-// Create a connection to the Redis container running at REDIS_HOST_PORT
-const redis = new Redis({ port: REDIS_HOST_PORT });
-redis.on("connect", () => console.log("Redis is connected!"));
-redis.on("error", (err) => console.log("Redis connection failed!\n", err));
+// Create connections to the Redis container running at REDIS_HOST_PORT
+const redisPub = new Redis({ port: REDIS_HOST_PORT });
+const redisSub = new Redis({ port: REDIS_HOST_PORT });
+// Publisher connection
+redisPub.on("connect", () => console.log("Redis is connected!"));
+redisPub.on("error", (err) => console.log("Redis connection failed!\n", err));
+// Subscriber connection
+redisSub.on("connect", () => console.log("Redis is connected!"));
+redisSub.on("error", (err) => console.log("Redis connection failed!\n", err));
+
+// The PUB/SUB bridge
+// SUBSCRIBE to specific channel
+redisSub.subscribe("chat_history", (err, count) => {
+    if (err) console.log("Failed to subscribe!\n", err);
+    else console.log(`Subscribed to ${count} channels`);
+});
+
+// Listen for any messages broadcasted to the servers through the channel
+redisSub.on("message", (channel, message) => {
+    if (channel === "chat_history") {
+        console.log("Message received from Redis: ", message);
+
+        // Pass the message from the server to it's connected clients
+        for (const client of clients) if (client.readyState === 1) client.send(message);
+    }
+});
 
 // Create the HTTP web server to serve the page request
 const server = http.createServer((req, res) => {
@@ -48,9 +71,9 @@ wss.on("connection", async (ws, req) => {
     clients.add(ws);
     console.log(`New client IP is: ${clientIp}. Total clients: ${clients.size}`);
 
-    // Fetch the chat history from the Redis database and send them to all the new clients that eventually connect
+    // Fetch the chat history from the Redis database and PUBLISH them to all the new clients that eventually connect to THIS server
     try {
-        const history = await redis.lrange("chat_history", 0, -1);
+        const history = await redisPub.lrange("chat_history", 0, -1);
         history.reverse().forEach((msg) => ws.send(msg));
     } catch (err) {
         console.log("Could not fetch chat history from Redis!\n", err)
@@ -63,10 +86,14 @@ wss.on("connection", async (ws, req) => {
 
         // First save the message to the Redis databse, trim the database, before broadcasting it to the rest of the clients
         try {
-            await redis.lpush("chat_history", msgStr);
-            await redis.ltrim("chat_history", 0, 49);
+            // Saving to Redis database
+            await redisPub.lpush("chat_history", msgStr);
+            await redisPub.ltrim("chat_history", 0, 49);
+
+            // Publish the message to all subscriber servers of the channel that are listening (including the publisher server).
+            await redisPub.publish("chat_history", msgStr);
         } catch (err) {
-            console.log("Something went wrong while saving the message to Redis database! \n", err);
+            console.log("Something went wrong while saving the message to Redis database or publishing the message! \n", err);
         }
 
         for (const client of clients) if (client.readyState === 1) client.send(msgStr);
@@ -78,9 +105,9 @@ wss.on("connection", async (ws, req) => {
     });
 });
 
-// Start listening to the PORT
-server.listen(SERVER_PORT, () => {
-    console.log(`Server started at PORT: ${PORT}`);
+// Start listening to the defined PORT
+server.listen(process.env.PORT || DEFAULT_SERVER_PORT, () => {
+    console.log(`Server started at PORT: ${process.env.PORT || DEFAULT_SERVER_PORT}`);
 });
 
 

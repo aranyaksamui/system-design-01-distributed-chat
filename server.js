@@ -12,10 +12,10 @@ const REDIS_HOST_PORT = 6262;
 const redisPub = new Redis({ port: REDIS_HOST_PORT });
 const redisSub = new Redis({ port: REDIS_HOST_PORT });
 // Publisher connection
-redisPub.on("connect", () => console.log("Redis is connected!"));
+redisPub.on("connect", () => console.log("Redis Publisher is connected!"));
 redisPub.on("error", (err) => console.log("Redis connection failed!\n", err));
 // Subscriber connection
-redisSub.on("connect", () => console.log("Redis is connected!"));
+redisSub.on("connect", () => console.log("Redis Subscriber is connected!"));
 redisSub.on("error", (err) => console.log("Redis connection failed!\n", err));
 
 // The PUB/SUB bridge
@@ -95,8 +95,6 @@ wss.on("connection", async (ws, req) => {
         } catch (err) {
             console.log("Something went wrong while saving the message to Redis database or publishing the message! \n", err);
         }
-
-        for (const client of clients) if (client.readyState === 1) client.send(msgStr);
     });
 
     ws.on("close", () => {

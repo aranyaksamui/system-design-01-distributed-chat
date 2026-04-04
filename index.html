@@ -25,7 +25,7 @@
     <div id="message"></div>
     
     <script>
-        const ws = new WebSocket("ws://localhost:8000");
+        const ws = new WebSocket(`ws://${location.host}`);
         const messageDiv = document.getElementById("message");
         let username;
         let message;

@@ -6,60 +6,58 @@ The primary objective of this project is to demonstrate core system design princ
 
 ## Architecture Overview
 
-The system is broken down into three main components:
+The system is broken down into four main components:
 
 1. **The Client (Frontend)**
 A simple HTML and vanilla JavaScript interface that utilizes the browser's native WebSocket API. It maintains a persistent two-way connection with the backend to send and receive messages in real time without polling.
-2. **The Compute Layer (Node.js Servers)**
-The backend uses Node.js native modules (`http`, `fs`, `path`) to serve the static frontend, and the `ws` library to handle WebSocket upgrades and framing. The servers act as stateless message routers. They hold active network connections in memory but do not store the application data or chat history.
-3. **The Data & Message Broker Layer (Redis)**
+2. **The Load Balancer (Nginx)**
+Acts as a reverse proxy and traffic cop at the entry point of the network. It intercepts incoming HTTP and WebSocket requests and uses a Round-Robin algorithm to distribute the connections evenly across the available Node.js server clones.
+3. **The Compute Layer (Node.js Servers)**
+The backend uses Node.js native modules to serve the static frontend, and the `ws` library to handle WebSocket upgrades and framing. Deployed as multiple identical replicas, these servers act as stateless message routers. They hold active network connections in memory but do not store the application data or chat history.
+4. **The Data & Message Broker Layer (Redis)**
 Redis serves two critical functions in this architecture:
     - **State Persistence:** Chat history is stored in a Redis List, ensuring that if a Node server crashes or restarts, the data is preserved and instantly served to new connections.
     - **Message Routing (Pub/Sub):** Because multiple Node servers run concurrently, users on Server A cannot directly talk to users on Server B. Redis acts as the central message bridge. When a message is sent to Server A, it is published to a Redis channel, which Server B is subscribed to, allowing Server B to broadcast the message to its respective users.
+### The Archiecture Diagram
+![System Architecture](./concepts/distributed_chat_system_architecture.png "Optional title")
 
 ## Prerequisites
 
-To run this project locally, you will need the following installed on your machine:
+Because the entire infrastructure is containerized, you no longer need to install Node.js or a package manager directly on your machine to run the cluster. You only need:
 
-- Node.js (v16 or higher recommended)
-- pnpm (Package manager)
-- Docker Desktop (To run the Redis instance)
+- Docker Desktop (Required to run the container orchestration)
+- Git (To clone the repository)
 
-## Installation and Setup
+## Installation and Running the Cluster
+
+The entire infrastructure (Database, Load Balancer, and Compute Replicas) is defined as code. You can launch the full distributed system with a single command.
 
 1. **Clone the repository**
 Download or clone the project files to your local machine and navigate into the project directory.
-2. **Install dependencies**
-Use pnpm to install the required Node modules.
+2. **Launch the infrastructure**
+Use Docker Compose to build the Node.js image and start the cluster in the background.
     
     ```bash
-    pnpm install
+    docker compose up --build -d
     ```
     
-3. **Start the Redis Database**
-You will need a running Redis instance. The easiest way to set this up is through Docker. Run the following command to spin up a containerized Redis server in the background:
-    
-    ```bash
-    docker run -d --name chat-redis -p 6379:6379 redis:alpine
-    ```
-    
-    *Note: If port 6379 is blocked on your system, you can map it to a different port (e.g., `-p 6262:6379`) and update your Redis connection settings in the server code accordingly.*
-    
+3. **Access the application**
+Open your web browser and navigate to `http://localhost:8080`. 
+Open additional browser tabs or windows to the same address. Because of the Nginx load balancer, your different tabs will secretly be routed to different Node.js containers, but you can send messages back and forth in real time.
 
-## Running the Application
+## Operations and Testing
 
-Once your dependencies are installed and your Redis container is running, you can start the application.
+To view the live logs of the cluster and watch Nginx route traffic to different Node containers in real time, run:
+```bash
+docker compose logs -f
+```
 
-1. Start the Node.js server:
-    
-    ```bash
-    node server.js
-    ```
-    
-2. Open your web browser and navigate to `http://localhost:8000`.
-3. Open a second browser tab or window to the same address. You can now send messages back and forth in real time.
+To test the high availability and persistence of the system, you can forcefully stop one of the Node.js replicas while the system is running. Nginx will automatically route new traffic to the surviving nodes, and Redis will ensure no chat history is lost.
 
-To test the persistence of the system, you can stop the Node.js server process in your terminal, restart it, and refresh your browser. The chat history will immediately repopulate from the Redis database.
+To tear down the cluster and clean up your environment, run:
+```bash
+docker compose down
+```
 
 ## Key Concepts Demonstrated
 
@@ -67,4 +65,4 @@ To test the persistence of the system, you can stop the Node.js server process i
 - **Decoupling:** Separating the application runtime from the data storage to prevent in-memory bottlenecks.
 - **In-Memory Data Stores:** Using Redis for sub-millisecond read/write operations suitable for real-time systems.
 - **Publish/Subscribe Architecture:** Fanning out messages across isolated server nodes to ensure high availability and cross-server communication.
-- **Containerization:** Using Docker to isolate infrastructure and prevent host operating system conflicts.
+- **Container Orchestration & Load Balancing:** Using Docker Compose and Nginx to build a virtual internal network, automate horizontal scaling, and distribute incoming traffic.

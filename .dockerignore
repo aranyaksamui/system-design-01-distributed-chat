@@ -12,3 +12,6 @@ pnpm-debug.log*
 # Ignore local environment variables to prevent leaking secrets into the image
 .env
 .env.*
+
+# README.md Concepts
+concepts/

@@ -1,0 +1,14 @@
+# Ignore the local node_modules so we don't overwrite the container ones, when we install
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Ignore git history
+.git/
+.gitignore
+
+# Ignore local environment variables to prevent leaking secrets into the image
+.env
+.env.*

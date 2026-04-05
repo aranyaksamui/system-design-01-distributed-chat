@@ -1,0 +1,29 @@
+services:
+  # Service 1: The fast data layer
+  redis:
+    image: redis:alpine
+
+  # Service 2: The compute layer (clones)
+  chat-node-app:
+    build: .
+    # Node server env variables
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    deploy:
+      # Deploy 3 clones of the nodejs server
+      replicas: 3
+    depends_on:
+      - redis
+
+  # SErvice 3: The load balancer (reverse proxy)
+  nginx:
+    image: nginx:alpine
+    # Take the nginx config from the project folder and overwrite the default config in the container
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    # Map the port 8080 of my machine to port 80 in nginx container
+    ports:
+      - "8080:80"
+    depends_on:
+      - chat-node-app

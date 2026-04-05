@@ -6,11 +6,11 @@ import Redis from "ioredis";
 
 
 const DEFAULT_SERVER_PORT = 8000;
-const REDIS_HOST_PORT = 6262;
+const DEFAULT_REDIS_PORT = 6379;
 
 // Create connections to the Redis container running at REDIS_HOST_PORT
-const redisPub = new Redis({ port: REDIS_HOST_PORT });
-const redisSub = new Redis({ port: REDIS_HOST_PORT });
+const redisPub = new Redis({ host: process.env.REDIS_HOST || "127.0.0.1", port: process.env.REDIS_PORT || DEFAULT_REDIS_PORT });
+const redisSub = new Redis({ host: process.env.REDIS_HOST || "127.0.0.1", port: process.env.REDIS_PORT || DEFAULT_REDIS_PORT });
 // Publisher connection
 redisPub.on("connect", () => console.log("Redis Publisher is connected!"));
 redisPub.on("error", (err) => console.log("Redis connection failed!\n", err));
